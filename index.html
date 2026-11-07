@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lab Transistor</title>
+<meta name="description" content="Game belajar transistor BJT, bias, dan penguat (Minggu 6-7).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: PCB board — a status header (player XP), then level "pads" wired along two boards (Minggu 6, Minggu 7) and a final chip. */
+:root{
+  --bg:#EDF3EF; --surface:#FFFFFF; --surface2:#F4F8F5; --ink:#14231D; --muted:#56695F; --line:#D2DED7;
+  --pcb:#0F3D2E; --pcb-ink:#E9F3EE; --trace:#1E7A57; --trace-soft:#DDEEE5; --copper:#B0601C; --copper-soft:#F6E7D8;
+  --gold:#C8901F; --bad:#B8362A; --bad-soft:#F8E1DE; --good:#1E7A57; --good-soft:#DDEEE5;
+  --f-display:"Chakra Petch","Segoe UI",system-ui,sans-serif; --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0A1A14; --surface:#10251D; --surface2:#142D24; --ink:#E4EFE9; --muted:#97B0A5; --line:#24443A;
+  --pcb:#0D2F23; --pcb-ink:#E4EFE9; --trace:#46C08D; --trace-soft:#173A2E; --copper:#E38D47; --copper-soft:#3A2817;
+  --gold:#EDC060; --bad:#EE7666; --bad-soft:#3D1D19; --good:#46C08D; --good-soft:#173A2E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A1A14; --surface:#10251D; --surface2:#142D24; --ink:#E4EFE9; --muted:#97B0A5; --line:#24443A;
+  --pcb:#0D2F23; --pcb-ink:#E4EFE9; --trace:#46C08D; --trace-soft:#173A2E; --copper:#E38D47; --copper-soft:#3A2817;
+  --gold:#EDC060; --bad:#EE7666; --bad-soft:#3D1D19; --good:#46C08D; --good-soft:#173A2E; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+.examhud{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:14px;margin-bottom:12px}
+.examhud .t{font-family:var(--f-mono);font-weight:600;padding:3px 10px;border-radius:8px;background:var(--copper-soft);color:var(--copper)}
+.examhud .v{padding:3px 10px;border-radius:8px;background:var(--bad-soft);color:var(--bad);font-weight:700}
+.exam-on, .exam-on *{-webkit-user-select:none;user-select:none}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.01em}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--copper);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+sub{font-size:.72em}
+
+/* header / player */
+.hud{background:var(--pcb);color:var(--pcb-ink);border-radius:14px;padding:18px 20px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;position:relative;overflow:hidden}
+.hud::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.07) 1px,transparent 1.5px);background-size:14px 14px;pointer-events:none}
+.hud h1{font-size:clamp(24px,4vw,32px);font-weight:700}
+.hud .sub{opacity:.8;font-size:14px}
+.rank{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0;position:relative;z-index:1}
+.rank .lbl{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
+.rank .name{font-family:var(--f-display);font-size:20px;font-weight:700;color:#F2B477}
+.xpbar{width:min(260px,60vw);height:10px;border-radius:6px;background:rgba(255,255,255,.14);overflow:hidden}
+.xpbar>i{display:block;height:100%;background:linear-gradient(90deg,#E38D47,#F2C66A);width:0;transition:width .6s}
+.xptext{font-size:13px;opacity:.85}
+.hud .left{position:relative;z-index:1;min-width:0}
+.sync{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;margin-top:8px;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.12)}
+.sync i{width:8px;height:8px;border-radius:50%;background:#F2C66A}
+.sync.ok i{background:#5BD39F}.sync.local i{background:#F2C66A}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin:18px 0 14px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 16px;border-radius:99px;font-weight:700;font-size:14px}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.notice{border:1px dashed var(--copper);background:var(--copper-soft);color:var(--ink);padding:10px 14px;border-radius:var(--r);font-size:14px;margin-bottom:14px}
+
+/* board */
+.board{margin-bottom:26px}
+.board-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.board-head h2{font-size:20px}
+.board-head .meta{color:var(--muted);font-size:14px}
+.pads{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;position:relative}
+.pad{position:relative;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:6px;min-height:150px;transition:transform .15s,border-color .15s}
+.pad:hover:not([disabled]){transform:translateY(-2px);border-color:var(--trace)}
+.pad .code{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.pad h3{font-size:16.5px;line-height:1.25}
+.pad p{margin:0;font-size:13px;color:var(--muted)}
+.pad .foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.chip.open{background:var(--copper-soft);color:var(--copper)}
+.chip.pass{background:var(--good-soft);color:var(--good)}
+.chip.lock{background:var(--surface2);color:var(--muted)}
+.pad[disabled]{cursor:not-allowed;border-style:dashed;background:var(--surface2)}
+.pad[disabled] h3,.pad[disabled] p{opacity:.6}
+.pad.boss{border-color:var(--copper);background:linear-gradient(160deg,var(--copper-soft),var(--surface) 60%)}
+.stars{display:inline-flex;gap:2px}
+.stars svg{width:16px;height:16px}
+.star-on{fill:var(--gold)}.star-off{fill:var(--line)}
+.pin{position:absolute;left:-6px;top:22px;width:10px;height:10px;border-radius:50%;background:var(--trace);box-shadow:0 0 0 3px var(--bg)}
+.pad[disabled] .pin{background:var(--line)}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.back{background:none;border:none;color:var(--trace);font-weight:700;padding:4px 0;margin-bottom:10px}
+.lesson-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}
+.lcard{background:var(--surface2);border-radius:var(--r);padding:14px 16px;min-width:0}
+.lcard h4{margin:0 0 6px;font-family:var(--f-display);font-size:15px;color:var(--trace)}
+.lcard p{margin:0;font-size:14.5px}
+.formula{font-family:var(--f-mono);font-size:15px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;overflow-x:auto;white-space:nowrap}
+.btn{border:none;border-radius:10px;padding:11px 20px;font-weight:700;font-size:15px;background:var(--copper);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* quiz */
+.qtop{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.dots{display:flex;gap:6px}
+.dots i{width:22px;height:6px;border-radius:3px;background:var(--line)}
+.dots i.now{background:var(--copper)}.dots i.ok{background:var(--good)}.dots i.no{background:var(--bad)}
+.ctx{background:var(--surface2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:14px;overflow-x:auto}
+.ctx table{border-collapse:collapse}
+.ctx td{padding:2px 14px 2px 0;white-space:nowrap}
+.ctx td:first-child{color:var(--muted)}
+.qtext{font-size:18px;font-weight:700;margin:4px 0 14px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.opt{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:12px 14px;text-align:left;font-size:15px}
+.opt:hover:not([disabled]){border-color:var(--copper)}
+.opt.sel-ok{border-color:var(--good);background:var(--good-soft)}
+.opt.sel-no{border-color:var(--bad);background:var(--bad-soft)}
+.numin{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.numin input{font-family:var(--f-mono);font-size:18px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);width:180px;max-width:100%}
+.unit{font-family:var(--f-mono);font-weight:600;color:var(--muted)}
+.fb{margin-top:16px;border-radius:var(--r);padding:14px 16px}
+.fb.ok{background:var(--good-soft)}.fb.no{background:var(--bad-soft)}
+.fb h4{margin:0 0 6px;font-family:var(--f-display);font-size:17px}
+.fb.ok h4{color:var(--good)}.fb.no h4{color:var(--bad)}
+.steps{margin:8px 0 0;padding-left:0;list-style:none;counter-reset:s;display:grid;gap:6px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start;font-size:14.5px}
+.steps li::before{content:counter(s);width:22px;height:22px;border-radius:50%;background:var(--copper);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.steps .mono{overflow-wrap:anywhere}
+
+/* result */
+.result{text-align:center;padding:10px 0}
+.result .big{font-family:var(--f-display);font-size:56px;font-weight:700;line-height:1}
+.result .stars svg{width:40px;height:40px}
+.newbadges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+
+/* badges */
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.badge{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:center}
+.badge .ico{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--copper-soft);color:var(--copper)}
+.badge.off{opacity:.55}.badge.off .ico{background:var(--surface2);color:var(--muted)}
+.badge h4{margin:0;font-family:var(--f-display);font-size:15px}
+.badge p{margin:0;font-size:13px;color:var(--muted)}
+.ico svg{width:24px;height:24px}
+
+/* identity */
+.ident{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-top:6px}
+.ident label{font-size:13px;color:var(--muted);display:grid;gap:4px}
+.ident input{padding:9px 11px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+
+/* dosen */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.tile .v{font-family:var(--f-display);font-size:30px;font-weight:700}
+.tile .k{font-size:13px;color:var(--muted)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.rekap{border-collapse:collapse;width:100%;font-size:14px;min-width:820px}
+.rekap th,.rekap td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.rekap th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--surface2)}
+.rekap td.c{text-align:center}
+.cell{display:inline-block;min-width:34px;text-align:center;border-radius:6px;padding:2px 4px;font-family:var(--f-mono);font-size:12px}
+.c0{background:var(--surface2);color:var(--muted)}.c1{background:var(--bad-soft);color:var(--bad)}.c2{background:var(--copper-soft);color:var(--copper)}.c3{background:var(--good-soft);color:var(--good)}
+.bars{display:grid;gap:8px;margin:6px 0 18px}
+.bar{display:grid;grid-template-columns:200px 1fr 46px;gap:10px;align-items:center;font-size:13.5px}
+.bar .track{height:12px;border-radius:6px;background:var(--surface2);overflow:hidden}
+.bar .track i{display:block;height:100%;background:var(--trace)}
+.bar .track i.low{background:var(--bad)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+@media (max-width:560px){.hud{grid-template-columns:1fr}.rank{align-items:flex-start}.bar{grid-template-columns:110px 1fr 40px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hud">
+    <div class="left">
+      <h1>Lab Transistor</h1>
+      <div class="sub">Misi belajar Elektronika · Minggu 6 (BJT) &amp; Minggu 7 (Bias &amp; Penguat)</div>
+      <div class="sync" id="sync"><i></i><span id="syncText">Memuat…</span></div>
+    </div>
+    <div class="rank">
+      <span class="lbl">Pangkat</span>
+      <span class="name" id="rankName">Pemula</span>
+      <div class="xpbar"><i id="xpFill"></i></div>
+      <span class="xptext mono" id="xpText">0 XP</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-map" aria-selected="true">Peta Misi</button>
+    <button class="tab" role="tab" id="tab-badges" aria-selected="false">Lencana</button>
+    <button class="tab" role="tab" id="tab-me" aria-selected="false">Identitas</button>
+  </nav>
+
+  <div id="notice" class="notice" hidden></div>
+  <main id="view"></main>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ================== KONFIGURASI DOSEN (ubah di sini) ================== */
+// Tempel URL Web app Google Apps Script (diakhiri /exec) di antara tanda kutip:
+const SHEET_URL = "TEMPEL_URL_WEB_APP_DI_SINI";
+// Aturan Ujian Akhir:
+const UJIAN = {
+  menit: 20,               // batas waktu ujian (menit)
+  maksPelanggaran: 3,      // ujian otomatis berakhir setelah sekian kali pindah tab/keluar layar penuh
+  wajibLayarPenuh: true,   // ujian dijeda bila keluar dari layar penuh
+  wajibSEB: false          // true = Ujian Akhir hanya bisa dimulai dari Safe Exam Browser
+};
+/* ======================================================================= */
+/* ---------------- helpers ---------------- */
+const $ = s => document.querySelector(s);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const f = (x, d = 2) => Number(x).toLocaleString("id-ID", { maximumFractionDigits: d, minimumFractionDigits: 0 });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// "I_B" -> I<sub>B</sub>, "r'_e" etc.
+const sx = s => esc(s).replace(/_\{([^}]*)\}/g, "<sub>$1</sub>").replace(/_([A-Za-z0-9()]+)/g, "<sub>$1</sub>");
+const par = (...r) => 1 / r.reduce((a, x) => a + 1 / x, 0);
+const parseNum = v => { const t = String(v).trim().replace(/\s/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."); return t === "" ? NaN : Number(t); };
+const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="${on ? "star-on" : "star-off"}" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`;
+const stars = n => `<span class="stars" aria-label="${n} bintang">${STAR(n >= 1)}${STAR(n >= 2)}${STAR(n >= 3)}</span>`;
+const ICON = {
+  lock: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7 10V8a5 5 0 0110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9a1 1 0 011-1h1zm2 0h6V8a3 3 0 00-6 0v2z"/></svg>',
+  chip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 2h2v3h4V2h2v3h1a2 2 0 012 2v1h3v2h-3v4h3v2h-3v1a2 2 0 01-2 2h-1v3h-2v-3h-4v3H8v-3H7a2 2 0 01-2-2v-1H2v-2h3v-4H2V8h3V7a2 2 0 012-2h1V2zm-1 5v10h10V7H7z"/></svg>',
+};
+
+/* ---------------- question builders ---------------- */
+const num = (q, ans, unit, steps, o = {}) => ({ kind: "num", q, ans, unit, steps, tol: o.tol ?? 0.03, ctx: o.ctx, dec: o.dec ?? 2 });
+const mcq = (q, opts, ans, why, o = {}) => ({ kind: "mcq", q, opts, ans, why, ctx: o.ctx });
+const ctxTable = rows => `<table>${rows.map(r => `<tr><td>${sx(r[0])}</td><td class="mono">${sx(r[1])}</td></tr>`).join("")}</table>`;
+// shuffle MCQ options, keep answer
+function mix(m) { const idx = shuffle(m.opts.map((_, i) => i)); return { ...m, opts: idx.map(i => m.opts[i]), ans: idx.indexOf(m.ans) }; }
+function sample(arr, n) { return shuffle(arr).slice(0, n); }
+
+/* ---------------- LEVELS ---------------- */
+const LEVELS = [
+{ id: "L1", week: 6, title: "Kenalan dengan BJT", desc: "Struktur, NPN/PNP, simbol",
+  lesson: [
+    ["Tiga lapisan, dua sambungan", "Emitor (doping paling tinggi), basis (sangat tipis), kolektor (paling besar). Sambungan BE dan BC menentukan cara kerjanya."],
+    ["NPN vs PNP", "Panah selalu di emitor. NPN: panah keluar. PNP: panah masuk. Agar NPN aktif, V_B ≈ 0,7 V di atas V_E."],
+    ["Analogi keran", "Arus basis kecil adalah tuas keran yang mengatur arus besar dari kolektor ke emitor."]],
+  gen() { return sample([
+    mcq("Pada transistor NPN, lapisan di tengah (basis) bertipe…", ["P", "N", "Intrinsik", "Logam"], 0, "NPN tersusun N–P–N, jadi basis di tengah bertipe P."),
+    mcq("Pada simbol NPN, panah di kaki emitor mengarah…", ["Keluar dari transistor", "Masuk ke transistor", "Ke kolektor", "Tidak ada panah"], 0, "NPN: \"N Never Points iN\". Panah keluar, searah arus konvensional."),
+    mcq("Daerah transistor dengan doping paling tinggi adalah…", ["Emitor", "Basis", "Kolektor", "Semua sama"], 0, "Emitor diberi doping paling tinggi karena tugasnya \"menyemprotkan\" pembawa muatan."),
+    mcq("Mengapa basis dibuat sangat tipis?", ["Agar sebagian besar elektron lolos ke kolektor", "Agar transistor lebih murah", "Agar tahan tegangan tinggi", "Agar arus basis besar"], 0, "Basis tipis membuat hanya sedikit elektron berekombinasi di basis; hampir semuanya sampai ke kolektor."),
+    mcq("BJT dikendalikan oleh…", ["Arus basis", "Tegangan gate", "Medan magnet", "Cahaya"], 0, "BJT = transistor dikendalikan arus. FET-lah yang dikendalikan tegangan gate."),
+    mcq("Tegangan V_BE transistor silikon saat menghantar kira-kira…", ["0,7 V", "0,3 V", "1,5 V", "5 V"], 0, "Silikon ≈ 0,7 V, germanium ≈ 0,3 V."),
+    mcq("Pasangan PNP yang umum untuk BC547 (NPN) adalah…", ["BC557", "2N3904", "TIP31", "2N3055"], 0, "BC547 (NPN) berpasangan dengan BC557 (PNP)."),
+  ], 5).map(mix); } },
+
+{ id: "L2", week: 6, title: "Arus, α, dan β", desc: "KCL, alpha, beta",
+  lesson: [
+    ["Hukum Kirchhoff arus", "Semua arus yang masuk keluar lewat emitor.", "I_E = I_C + I_B"],
+    ["Beta (penguatan arus)", "Berapa kali arus basis diperbesar. Di datasheet disebut h_FE.", "β = I_C / I_B"],
+    ["Alpha dan hubungannya", "α selalu sedikit di bawah 1.", "α = I_C/I_E ; β = α/(1−α)"]],
+  gen() {
+    const IB = pick([10, 15, 20, 25, 40]), IC = pick([1, 1.5, 2, 3, 4]); const IE = IC + IB / 1000;
+    const a2 = pick([0.98, 0.99, 0.995]); const b3 = pick([80, 100, 120, 150, 200]), IB3 = pick([10, 20, 30, 50]);
+    return [
+      num(`Diketahui I_B = ${IB} µA dan I_C = ${f(IC)} mA. Hitung I_E.`, IE, "mA", [`I_E = I_C + I_B`, `I_B = ${IB} µA = ${f(IB / 1000, 3)} mA (samakan satuan)`, `I_E = ${f(IC)} + ${f(IB / 1000, 3)} = ${f(IE, 3)} mA`], { tol: 0.002 }),
+      num(`Dari data yang sama (I_B = ${IB} µA, I_C = ${f(IC)} mA), hitung β.`, IC * 1000 / IB, "", [`β = I_C / I_B`, `I_C = ${f(IC)} mA = ${f(IC * 1000)} µA`, `β = ${f(IC * 1000)} / ${IB} = ${f(IC * 1000 / IB)}`]),
+      num(`Hitung α jika I_C = ${f(IC)} mA dan I_E = ${f(IE, 3)} mA (3 angka di belakang koma).`, IC / IE, "", [`α = I_C / I_E`, `α = ${f(IC)} / ${f(IE, 3)}`, `α = ${f(IC / IE, 3)}`], { tol: 0.002, dec: 3 }),
+      num(`Sebuah transistor memiliki α = ${f(a2, 3)}. Berapa β?`, a2 / (1 - a2), "", [`β = α / (1 − α)`, `β = ${f(a2, 3)} / ${f(1 - a2, 3)}`, `β = ${f(a2 / (1 - a2))}`]),
+      num(`β = ${b3} dan I_B = ${IB3} µA. Berapa I_C?`, b3 * IB3 / 1000, "mA", [`I_C = β · I_B`, `I_C = ${b3} × ${IB3} µA = ${b3 * IB3} µA`, `I_C = ${f(b3 * IB3 / 1000)} mA`]),
+    ];
+  } },
+
+{ id: "L3", week: 6, title: "Analisis Rangkaian CE", desc: "I_B → I_C → V_CE",
+  lesson: [
+    ["Loop basis (KVL)", "Tegangan V_BB dikurangi 0,7 V jatuh di R_B.", "I_B = (V_BB − V_BE) / R_B"],
+    ["Loop kolektor", "Tegangan V_CC dibagi antara R_C dan transistor.", "V_CE = V_CC − I_C·R_C"],
+    ["Urutan menghitung", "I_B → I_C = β·I_B → V_CE → V_CB = V_CE − 0,7 V. Ingat: mA × kΩ = V."]],
+  gen() {
+    let c; do { c = { VBB: pick([2, 3, 5]), RB: pick([47, 68, 100, 150, 220]), RC: pick([0.47, 1, 2.2]), VCC: pick([10, 12, 15]), b: pick([100, 150, 200]) };
+      c.IB = (c.VBB - 0.7) / c.RB * 1000; c.IC = c.b * c.IB / 1000; c.VCE = c.VCC - c.IC * c.RC; } while (c.VCE < 1.5 || c.VCE > c.VCC - 1);
+    const ctx = ctxTable([["V_BB", `${c.VBB} V`], ["R_B", `${c.RB} kΩ`], ["R_C", `${f(c.RC)} kΩ`], ["V_CC", `${c.VCC} V`], ["β", c.b], ["V_BE", "0,7 V (silikon)"]]);
+    return [
+      num("Hitung arus basis I_B.", c.IB, "µA", [`I_B = (V_BB − V_BE)/R_B`, `I_B = (${c.VBB} − 0,7) V / ${c.RB} kΩ = ${f(c.VBB - 0.7)} / ${c.RB} mA`, `I_B = ${f(c.IB / 1000, 4)} mA = ${f(c.IB)} µA`], { ctx }),
+      num("Hitung arus kolektor I_C.", c.IC, "mA", [`I_B = ${f(c.IB)} µA`, `I_C = β · I_B = ${c.b} × ${f(c.IB)} µA`, `I_C = ${f(c.IC * 1000)} µA = ${f(c.IC, 3)} mA`], { ctx }),
+      num("Hitung tegangan V_CE.", c.VCE, "V", [`I_C = ${f(c.IC, 3)} mA`, `V_RC = I_C·R_C = ${f(c.IC, 3)} mA × ${f(c.RC)} kΩ = ${f(c.IC * c.RC)} V`, `V_CE = ${c.VCC} − ${f(c.IC * c.RC)} = ${f(c.VCE)} V`], { ctx }),
+      num("Hitung tegangan V_CB.", c.VCE - 0.7, "V", [`V_CE = ${f(c.VCE)} V (hitung dulu dari loop kolektor)`, `V_CB = V_CE − V_BE`, `V_CB = ${f(c.VCE)} − 0,7 = ${f(c.VCE - 0.7)} V`], { ctx }),
+      num("Hitung disipasi daya transistor P_D.", c.VCE * c.IC, "mW", [`P_D = V_CE · I_C`, `P_D = ${f(c.VCE)} V × ${f(c.IC, 3)} mA`, `P_D = ${f(c.VCE * c.IC)} mW`], { ctx }),
+    ];
+  } },
+
+{ id: "L4", week: 6, title: "Daerah Kerja", desc: "Aktif, saturasi, cut-off",
+  lesson: [
+    ["Cut-off (saklar OFF)", "I_B = 0 atau V_BB < 0,7 V. I_C ≈ 0 dan V_CE ≈ V_CC."],
+    ["Aktif (penguat)", "BE maju, BC mundur. I_C = β·I_B dan V_CE di atas ±0,2 V."],
+    ["Saturasi (saklar ON)", "Jika β·I_B lebih besar dari arus maksimum, transistor jenuh.", "I_C(sat) = (V_CC − 0,2) / R_C"]],
+  gen() {
+    const one = (want) => { let c, reg; let n = 0; do { n++; c = { VBB: want === "cut" ? pick([0, 0.3, 0.5]) : pick([2, 3, 5]), RB: want === "sat" ? pick([4.7, 10, 22]) : pick([100, 150, 220, 330]), RC: pick([1, 2.2]), VCC: pick([10, 12]), b: pick([50, 100, 150]) };
+        c.IB = Math.max(0, (c.VBB - 0.7) / c.RB); c.bIB = c.b * c.IB; c.Isat = (c.VCC - 0.2) / c.RC;
+        reg = c.VBB < 0.7 ? "cut" : (c.bIB >= c.Isat ? "sat" : "act"); } while (reg !== want && n < 200);
+      const names = { act: "Aktif", sat: "Saturasi", cut: "Cut-off" };
+      const ctx = ctxTable([["V_BB", `${f(c.VBB)} V`], ["R_B", `${f(c.RB)} kΩ`], ["R_C", `${f(c.RC)} kΩ`], ["V_CC", `${c.VCC} V`], ["β", c.b]]);
+      const why = reg === "cut" ? `V_BB = ${f(c.VBB)} V lebih kecil dari 0,7 V, jadi I_B = 0, I_C ≈ 0 → Cut-off.`
+        : `I_B = (${c.VBB} − 0,7)/${f(c.RB)} kΩ = ${f(c.IB * 1000)} µA. β·I_B = ${f(c.bIB, 3)} mA. I_C(sat) = (${c.VCC} − 0,2)/${f(c.RC)} kΩ = ${f(c.Isat, 3)} mA. ${reg === "sat" ? `${f(c.bIB, 3)} > ${f(c.Isat, 3)} → Saturasi.` : `${f(c.bIB, 3)} < ${f(c.Isat, 3)} → Aktif.`}`;
+      return mcq("Transistor pada rangkaian ini bekerja di daerah…", ["Aktif", "Saturasi", "Cut-off"], ["act", "sat", "cut"].indexOf(reg), why, { ctx }); };
+    return [one(pick(["act", "sat"])), one("cut"), one("sat"), one("act"),
+      mix(mcq("Agar output penguat tidak terpotong, transistor harus tetap di daerah…", ["Aktif", "Saturasi", "Cut-off", "Breakdown"], 0, "Penguat linier bekerja di daerah aktif. Saturasi dan cut-off memotong sinyal."))];
+  } },
+
+{ id: "L5", week: 6, title: "Desain Saklar LED", desc: "Menghitung R_C dan R_B",
+  lesson: [
+    ["Loop kolektor saat ON", "V_CC terbagi di R_C, LED, dan V_CE(sat) ≈ 0,2 V.", "R_C = (V_CC − V_LED − 0,2) / I_LED"],
+    ["Arus basis", "Beri arus basis 5× lebih besar dari minimum agar pasti jenuh (overdrive).", "I_B = 5 × I_C / β"],
+    ["Resistor basis", "Sinyal Vin = 5 V dari mikrokontroler.", "R_B = (V_in − 0,7) / I_B"]],
+  gen() {
+    const VCC = pick([5, 9, 12]), Vf = pick([1.8, 2, 3]), I = pick([10, 15, 20]), b = 100;
+    const RC = (VCC - Vf - 0.2) / I * 1000, IBm = I / b, IB = 5 * IBm, RB = 4.3 / IB;
+    const ctx = ctxTable([["V_CC", `${VCC} V`], ["LED", `V_LED = ${f(Vf)} V, I_LED = ${I} mA`], ["V_CE(sat)", "0,2 V"], ["β (minimum)", b], ["V_in (HIGH)", "5 V"]]);
+    return [
+      num("Hitung R_C (sebelum dibulatkan ke nilai standar).", RC, "Ω", [`R_C = (V_CC − V_LED − V_CE(sat)) / I_LED`, `R_C = (${VCC} − ${f(Vf)} − 0,2) V / ${I} mA = ${f(VCC - Vf - 0.2)} / ${f(I / 1000, 3)}`, `R_C = ${f(RC, 1)} Ω → pilih nilai standar di atasnya`], { ctx }),
+      num("Hitung arus basis minimum I_B(min) agar tepat jenuh.", IBm, "mA", [`I_B(min) = I_C / β`, `I_B(min) = ${I} mA / ${b}`, `I_B(min) = ${f(IBm, 3)} mA`], { ctx }),
+      num("Dengan faktor overdrive 5×, berapa I_B yang dipakai?", IB, "mA", [`I_B = 5 × I_B(min)`, `I_B = 5 × ${f(IBm, 3)} mA`, `I_B = ${f(IB, 3)} mA`], { ctx }),
+      num("Hitung R_B (sebelum dibulatkan).", RB, "kΩ", [`R_B = (V_in − V_BE) / I_B`, `R_B = (5 − 0,7) V / ${f(IB, 3)} mA`, `R_B = 4,3 / ${f(IB, 3)} = ${f(RB)} kΩ`], { ctx }),
+      mix(mcq("Jika bebannya relay (kumparan), komponen apa yang wajib dipasang paralel terbalik dengan kumparan?", ["Dioda flyback", "Kapasitor kopling", "Resistor pull-up", "LED indikator"], 0, "Dioda flyback menyerap lonjakan tegangan saat transistor mati, sehingga transistor tidak rusak (breakdown).")),
+    ];
+  } },
+
+{ id: "L6", week: 7, title: "Titik Q & Garis Beban", desc: "Q-point, saturasi, cut-off",
+  lesson: [
+    ["Titik Q", "Nilai DC I_C dan V_CE saat belum ada sinyal. Sinyal berayun di sekitarnya."],
+    ["Dua ujung garis beban", "Saturasi (V_CE ≈ 0) dan cut-off (I_C = 0).", "I_C(sat) = V_CC/R_C ; V_CE(off) = V_CC"],
+    ["Posisi ideal", "Untuk penguat, titik Q di sekitar tengah garis beban agar sinyal tidak terpotong."]],
+  gen() {
+    let c; do { c = { VCC: pick([9, 10, 12]), RC: pick([220, 330, 470]), IB: pick([100, 150, 200, 250]), b: 100 }; c.IC = c.b * c.IB / 1000; c.Isat = c.VCC / c.RC * 1000; } while (c.IC > 0.85 * c.Isat || c.IC < 0.2 * c.Isat);
+    c.VCE = c.VCC - c.IC / 1000 * c.RC;
+    const ctx = ctxTable([["V_CC", `${c.VCC} V`], ["R_C", `${c.RC} Ω`], ["β", c.b], ["I_B", `${c.IB} µA`]]);
+    return [
+      num("Hitung I_C(sat), ujung atas garis beban.", c.Isat, "mA", [`Saturasi: V_CE ≈ 0`, `I_C(sat) = V_CC / R_C = ${c.VCC} V / ${c.RC} Ω`, `I_C(sat) = ${f(c.Isat / 1000, 4)} A = ${f(c.Isat)} mA`], { ctx }),
+      num("Hitung V_CE(off), ujung kanan garis beban.", c.VCC, "V", [`Cut-off: I_C = 0, tidak ada tegangan jatuh di R_C`, `V_CE(off) = V_CC`, `V_CE(off) = ${c.VCC} V`], { ctx }),
+      num("Hitung I_C pada titik Q.", c.IC, "mA", [`I_C = β · I_B`, `I_C = ${c.b} × ${c.IB} µA = ${c.b * c.IB} µA`, `I_C = ${f(c.IC)} mA`], { ctx }),
+      num("Hitung V_CE pada titik Q.", c.VCE, "V", [`V_RC = I_C·R_C = ${f(c.IC / 1000, 4)} A × ${c.RC} Ω = ${f(c.IC / 1000 * c.RC)} V`, `V_CE = V_CC − V_RC`, `V_CE = ${c.VCC} − ${f(c.IC / 1000 * c.RC)} = ${f(c.VCE)} V`], { ctx }),
+      mix(mcq("Titik Q terbaik untuk penguat sinyal besar terletak…", ["Di sekitar tengah garis beban", "Di dekat saturasi", "Di dekat cut-off", "Di daerah breakdown"], 0, "Di tengah garis beban, sinyal punya ruang ayun maksimum ke atas dan ke bawah.")),
+    ];
+  } },
+
+{ id: "L7", week: 7, title: "Bias Pembagi Tegangan", desc: "V_B → V_E → I_E → V_CE",
+  lesson: [
+    ["Tegangan basis", "R1 dan R2 membagi V_CC (berlaku jika β·R_E ≥ 10·R2).", "V_B = V_CC · R2/(R1+R2)"],
+    ["Emitor dan arus", "Emitor 0,7 V di bawah basis. I_C ≈ I_E.", "V_E = V_B − 0,7 ; I_E = V_E/R_E"],
+    ["Kolektor", "", "V_C = V_CC − I_C·R_C ; V_CE = V_C − V_E"]],
+  gen() {
+    let c; do { c = { VCC: pick([10, 12, 15]), R1: pick([22, 33, 47]), R2: pick([4.7, 6.8, 10]), RC: pick([1, 1.5, 2.2]), RE: pick([0.47, 0.56, 1]), b: 150 };
+      c.VB = c.VCC * c.R2 / (c.R1 + c.R2); c.VE = c.VB - 0.7; c.IE = c.VE / c.RE; c.VC = c.VCC - c.IE * c.RC; c.VCE = c.VC - c.VE; }
+    while (c.VCE < 1.5 || c.VCE > c.VCC - 1.5 || c.b * c.RE < 10 * c.R2 || c.VE < 0.3);
+    const ctx = ctxTable([["V_CC", `${c.VCC} V`], ["R1 ; R2", `${c.R1} kΩ ; ${f(c.R2)} kΩ`], ["R_C ; R_E", `${f(c.RC)} kΩ ; ${f(c.RE * 1000, 0)} Ω`], ["β", c.b]]);
+    return [
+      num("Hitung tegangan basis V_B.", c.VB, "V", [`V_B = V_CC · R2/(R1 + R2)`, `V_B = ${c.VCC} × ${f(c.R2)}/(${c.R1} + ${f(c.R2)})`, `V_B = ${f(c.VB)} V`], { ctx }),
+      num("Hitung tegangan emitor V_E.", c.VE, "V", [`V_B = ${f(c.VB)} V`, `V_E = V_B − 0,7`, `V_E = ${f(c.VE)} V`], { ctx }),
+      num("Hitung arus emitor I_E (≈ I_C).", c.IE, "mA", [`V_E = ${f(c.VE)} V`, `I_E = V_E / R_E = ${f(c.VE)} V / ${f(c.RE)} kΩ`, `I_E = ${f(c.IE, 3)} mA`], { ctx }),
+      num("Hitung tegangan kolektor V_C.", c.VC, "V", [`I_C ≈ ${f(c.IE, 3)} mA`, `V_C = V_CC − I_C·R_C = ${c.VCC} − (${f(c.IE, 3)} × ${f(c.RC)})`, `V_C = ${c.VCC} − ${f(c.IE * c.RC)} = ${f(c.VC)} V`], { ctx }),
+      num("Hitung V_CE.", c.VCE, "V", [`V_C = ${f(c.VC)} V ; V_E = ${f(c.VE)} V`, `V_CE = V_C − V_E`, `V_CE = ${f(c.VCE)} V`], { ctx }),
+    ];
+  } },
+
+{ id: "L8", week: 7, title: "Metode Bias & Stabilitas", desc: "Base, emitter, feedback",
+  lesson: [
+    ["Base bias", "Paling sederhana, tetapi I_C sebanding langsung dengan β (paling tidak stabil).", "I_C = β (V_CC − 0,7)/R_B"],
+    ["Feedback", "Emitter-feedback menambah R_E. Collector-feedback mengambil R_B dari kolektor sehingga mengoreksi diri."],
+    ["Paling populer", "Voltage-divider: satu catu daya dan hampir tidak bergantung β."]],
+  gen() {
+    const RB = pick([220, 330, 470]), b = pick([100, 150, 200]); const IC = b * 11.3 / RB;
+    return [
+      num(`Base bias: V_CC = 12 V, R_B = ${RB} kΩ, β = ${b}. Hitung I_C.`, IC, "mA", [`I_B = (V_CC − 0,7)/R_B = 11,3 V / ${RB} kΩ = ${f(11.3 / RB * 1000)} µA`, `I_C = β · I_B = ${b} × ${f(11.3 / RB * 1000)} µA`, `I_C = ${f(IC, 3)} mA`]),
+      ...sample([
+        mcq("Metode bias yang paling stabil dan hanya butuh satu sumber adalah…", ["Voltage-divider bias", "Base bias", "Emitter-feedback bias", "Emitter bias"], 0, "Voltage-divider hanya butuh V_CC dan titik Q-nya hampir tidak bergantung pada β."),
+        mcq("Jika β naik dua kali pada base bias, I_C akan…", ["Naik dua kali (100%)", "Tetap", "Turun setengah", "Naik sedikit (±5%)"], 0, "Pada base bias I_C = β·I_B dan I_B tetap, jadi I_C ikut naik 100%."),
+        mcq("Pada collector-feedback bias, resistor R_B dihubungkan dari…", ["Kolektor ke basis", "V_CC ke basis", "Emitor ke ground", "Basis ke ground"], 0, "R_B dari kolektor membuat umpan balik: I_C naik → V_C turun → I_B turun."),
+        mcq("Emitter bias membutuhkan…", ["Dua sumber: +V_CC dan −V_EE", "Satu sumber V_CC saja", "Baterai di basis", "Kapasitor bypass"], 0, "Emitter bias memakai catu ganda; basis dihubungkan ke ground lewat R_B."),
+        mcq("Syarat pembagi tegangan \"kaku\" (rumus cepat boleh dipakai) adalah…", ["β·R_E ≥ 10·R2", "R1 = R2", "R_C ≥ 10·R_E", "V_CC ≥ 10 V"], 0, "β·R_E adalah resistansi yang dilihat dari basis; jika jauh lebih besar dari R2, arus basis bisa diabaikan."),
+        mcq("Fungsi utama R_E pada rangkaian bias adalah…", ["Menstabilkan titik Q (umpan balik negatif)", "Memperbesar gain AC", "Membatasi arus LED", "Membuang DC dari output"], 0, "Jika I_C naik, tegangan di R_E naik, V_BE turun, dan I_C kembali turun."),
+      ], 4).map(mix),
+    ];
+  } },
+
+{ id: "L9", week: 7, title: "Penguat CE", desc: "r'e, R_in, A_v",
+  lesson: [
+    ["Resistansi AC emitor", "Dihitung dari arus DC titik Q.", "r'_e = 25 mV / I_E"],
+    ["Resistansi input", "Dari basis, r'_e terlihat β kali lebih besar. R1 dan R2 paralel untuk AC.", "R_in(base) = β_ac·r'_e"],
+    ["Penguatan tegangan", "Dengan R_E di-bypass C2. Output terbalik 180°.", "A_v = R_C / r'_e"]],
+  gen() {
+    const IE = pick([1, 1.25, 2, 2.5, 3.5, 5]), RC = pick([1, 2.2, 3.3]), bac = pick([100, 150, 160]), R1 = pick([22, 33, 47]), R2 = pick([6.8, 10]);
+    const re = 25 / IE, Av = RC * 1000 / re, Rinb = bac * re, Rin = par(R1 * 1000, R2 * 1000, Rinb);
+    const ctx = ctxTable([["I_E (titik Q)", `${f(IE)} mA`], ["R_C", `${f(RC)} kΩ`], ["β_ac", bac], ["R1 ; R2", `${R1} kΩ ; ${f(R2)} kΩ`], ["C2", "terpasang (R_E di-bypass)"]]);
+    return [
+      num("Hitung r'_e.", re, "Ω", [`r'_e = 25 mV / I_E`, `r'_e = 25 / ${f(IE)}`, `r'_e = ${f(re)} Ω`], { ctx }),
+      num("Hitung penguatan tegangan A_v (tanpa beban).", Av, "×", [`r'_e = ${f(re)} Ω`, `A_v = R_C / r'_e = ${f(RC * 1000, 0)} / ${f(re)}`, `A_v = ${f(Av, 1)}`], { ctx }),
+      num("Hitung R_in(base).", Rinb, "Ω", [`r'_e = ${f(re)} Ω`, `R_in(base) = β_ac · r'_e = ${bac} × ${f(re)}`, `R_in(base) = ${f(Rinb, 0)} Ω`], { ctx }),
+      num("Hitung R_in(tot) = R1 ∥ R2 ∥ R_in(base).", Rin, "Ω", [`R_in(base) = ${f(Rinb, 0)} Ω`, `1/R_in(tot) = 1/${R1 * 1000} + 1/${f(R2 * 1000, 0)} + 1/${f(Rinb, 0)}`, `R_in(tot) = ${f(Rin, 0)} Ω`], { ctx }),
+      mix(mcq("Sinyal output penguat CE dibanding inputnya…", ["Terbalik 180°", "Sefase (0°)", "Bergeser 90°", "Tidak berubah bentuk dan besar"], 0, "Input naik → I_C naik → tegangan di R_C naik → V_C turun. Jadi terbalik 180°.", { ctx })),
+    ];
+  } },
+
+{ id: "L10", week: 7, title: "Bypass & Beban", desc: "C2, R_L, dB",
+  lesson: [
+    ["Kapasitor bypass", "Pada frekuensi terendah, X_C2 minimal 10× lebih kecil dari R_E.", "C2 = 1 / (2π·f·R_E/10)"],
+    ["Tanpa C2", "R_E ikut di penyebut, gain turun drastis.", "A_v = R_C/(r'_e + R_E)"],
+    ["Dengan beban", "R_C paralel dengan R_L. Dalam desibel: 20·log A_v.", "R_c = R_C∥R_L ; A_v = R_c/r'_e"]],
+  gen() {
+    const RE = pick([470, 560, 1000]), fr = pick([50, 100, 200]), IE = pick([2, 2.5, 4]), RC = pick([1000, 2200]), RL = pick([2200, 5000, 10000]);
+    const re = 25 / IE, C = 1 / (2 * Math.PI * fr * RE / 10) * 1e6, Av0 = RC / (re + RE), Rc = par(RC, RL), AvL = Rc / re, dB = 20 * Math.log10(AvL);
+    const ctx = ctxTable([["R_E", `${RE} Ω`], ["R_C", `${f(RC / 1000)} kΩ`], ["I_E", `${f(IE)} mA → r'_e = ${f(re)} Ω`], ["R_L", `${f(RL / 1000)} kΩ`], ["f terendah", `${fr} Hz`]]);
+    return [
+      num("Hitung nilai minimum C2.", C, "µF", [`X_C2 = R_E/10 = ${RE}/10 = ${f(RE / 10)} Ω`, `C2 = 1/(2π · ${fr} · ${f(RE / 10)})`, `C2 = ${f(C, 1)} µF (minimum, pilih nilai standar di atasnya)`], { ctx }),
+      num("Hitung A_v jika C2 dilepas (tanpa beban).", Av0, "×", [`A_v = R_C / (r'_e + R_E)`, `A_v = ${RC} / (${f(re)} + ${RE}) = ${RC} / ${f(re + RE)}`, `A_v = ${f(Av0)}`], { ctx }),
+      num("Hitung R_c = R_C ∥ R_L.", Rc, "Ω", [`R_c = R_C·R_L/(R_C + R_L)`, `R_c = (${RC} × ${RL}) / (${RC} + ${RL})`, `R_c = ${f(Rc, 0)} Ω`], { ctx }),
+      num("Hitung A_v dengan C2 dan beban R_L.", AvL, "×", [`R_c = ${f(Rc, 0)} Ω`, `A_v = R_c / r'_e = ${f(Rc, 0)} / ${f(re)}`, `A_v = ${f(AvL, 1)}`], { ctx }),
+      num("Nyatakan penguatan dengan beban dalam desibel.", dB, "dB", [`A_v = ${f(AvL, 1)}`, `A_v(dB) = 20 · log(${f(AvL, 1)}) = 20 × ${f(Math.log10(AvL), 3)}`, `A_v(dB) = ${f(dB, 1)} dB`], { ctx }),
+    ];
+  } },
+
+{ id: "BOSS", week: 0, title: "Ujian Akhir Lab", desc: "8 soal acak dari semua misi",
+  lesson: [
+    ["Aturan ujian", `8 soal acak dari misi 2–10, waktu ${UJIAN.menit} menit, dan HANYA SEKALI dikerjakan. Pembahasan tidak ditampilkan selama ujian.`],
+    ["Pengawasan", `Ujian berjalan di layar penuh. Pindah tab, pindah aplikasi, atau keluar layar penuh dicatat; setelah ${UJIAN.maksPelanggaran} kali ujian berakhir otomatis. Menutup atau memuat ulang halaman juga mengakhiri ujian.`],
+    ["Sebelum mulai", "Siapkan kalkulator dan kertas coretan, tutup aplikasi lain, dan pastikan baterai cukup. Lulus mulai 60%."]],
+  gen() {
+    const ids = ["L2", "L3", "L4", "L5", "L6", "L7", "L9", "L10"];
+    return shuffle(ids.map(id => pick(LEVELS.find(l => l.id === id).gen())));
+  } },
+];
+const LV = Object.fromEntries(LEVELS.map(l => [l.id, l]));
+
+/* ---------------- progress model ---------------- */
+let P = { nim: "", kelas: "", levels: {} };
+const PASS = 60;
+const starsFor = p => p >= 90 ? 3 : p >= 75 ? 2 : p >= PASS ? 1 : 0;
+const passed = id => (P.levels[id]?.best ?? 0) >= PASS;
+const unlocked = i => { const l = LEVELS[i]; if (l.id === "BOSS") return LEVELS.slice(0, 10).every(x => passed(x.id)); return i === 0 || passed(LEVELS[i - 1].id); };
+function totals(p = P) {
+  let xp = 0, st = 0, pass = 0, att = 0;
+  for (const l of LEVELS) { const r = p.levels?.[l.id]; if (!r) continue; xp += Math.round(r.best) + (r.stars === 3 ? 20 : 0); st += r.stars || 0; if (r.best >= PASS) pass++; att += r.attempts || 0; }
+  return { xp, stars: st, passed: pass, attempts: att };
+}
+const RANKS = [[0, "Pemula"], [200, "Perakit"], [500, "Teknisi"], [850, "Analis"], [1150, "Insinyur"]];
+const rankOf = xp => { let r = RANKS[0], next = null; for (let i = 0; i < RANKS.length; i++) { if (xp >= RANKS[i][0]) { r = RANKS[i]; next = RANKS[i + 1] || null; } } return { r, next }; };
+const BADGES = [
+  ["first", "Saklar Pertama", "Lulus misi pertama", () => passed("L1")],
+  ["beta", "Pemburu β", "3 bintang di misi Arus, α, dan β", () => P.levels.L2?.stars === 3],
+  ["ce", "Analis CE", "Lulus misi Analisis Rangkaian CE", () => passed("L3")],
+  ["w6", "Penakluk Minggu 6", "Lulus semua misi Minggu 6", () => ["L1", "L2", "L3", "L4", "L5"].every(passed)],
+  ["bias", "Ahli Bias", "3 bintang di Bias Pembagi Tegangan", () => P.levels.L7?.stars === 3],
+  ["w7", "Penakluk Minggu 7", "Lulus semua misi Minggu 7", () => ["L6", "L7", "L8", "L9", "L10"].every(passed)],
+  ["boss", "Insinyur Penguat", "Lulus Ujian Akhir Lab", () => passed("BOSS")],
+  ["perfect", "Sempurna", "3 bintang di semua misi", () => LEVELS.every(l => P.levels[l.id]?.stars === 3)],
+  ["grit", "Pantang Menyerah", "Mencoba misi 15 kali", () => totals().attempts >= 15],
+];
+const earned = () => BADGES.filter(b => b[3]()).map(b => b[0]);
+
+/* ---------------- storage ---------------- */
+const LS = "lab-transistor-progress", LQ = "lab-transistor-antrean";
+const sheetReady = () => /^https:\/\/script\.google(usercontent)?\.com\/.+\/exec$/.test(SHEET_URL.trim());
+let OUTBOX = [], sending = false;
+const identOK = () => !!(P.nama && P.nim && P.kelas);
+function loadLocal() { try { const t = localStorage.getItem(LS); if (t) P = Object.assign({ nama: "", nim: "", kelas: "", levels: {} }, JSON.parse(t)); const q = localStorage.getItem(LQ); if (q) OUTBOX = JSON.parse(q) || []; } catch (e) { } }
+function saveLocal() { try { localStorage.setItem(LS, JSON.stringify(P)); localStorage.setItem(LQ, JSON.stringify(OUTBOX)); } catch (e) { } }
+function setSync() {
+  const el = $("#sync"), tx = $("#syncText");
+  if (!sheetReady()) { el.className = "sync local"; tx.textContent = "Mode latihan: nilai belum tersambung ke dosen"; return; }
+  if (OUTBOX.length) { el.className = "sync local"; tx.textContent = `${OUTBOX.length} nilai menunggu koneksi internet`; return; }
+  el.className = "sync ok"; tx.textContent = identOK() ? `Nilai terkirim ke dosen · ${P.nim}` : "Tersambung ke dosen";
+}
+async function flush() {
+  if (sending || !sheetReady() || !OUTBOX.length) { setSync(); return; }
+  sending = true;
+  while (OUTBOX.length) {
+    try {
+      await fetch(SHEET_URL.trim(), { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(OUTBOX[0]) });
+      OUTBOX.shift(); saveLocal();
+    } catch (e) { break; }
+  }
+  sending = false; setSync();
+}
+function persist() { const t = totals(); P.xp = t.xp; P.stars = t.stars; P.passed = t.passed; P.updatedAt = Date.now(); saveLocal(); }
+function submit(rec) { if (!sheetReady()) return; OUTBOX.push(rec); saveLocal(); flush(); }
+window.addEventListener("online", flush);
+setInterval(flush, 60000);
+function notice(msg) { const n = $("#notice"); if (!msg) { n.hidden = true; return; } n.hidden = false; n.textContent = msg; }
+
+/* ---------------- views ---------------- */
+const state = { tab: "map", level: null, quiz: null, inQuiz: false, result: null };
+function header() {
+  const t = totals(); const { r, next } = rankOf(t.xp);
+  $("#rankName").textContent = r[1];
+  const pct = next ? (t.xp - r[0]) / (next[0] - r[0]) * 100 : 100;
+  $("#xpFill").style.width = Math.min(100, pct) + "%";
+  $("#xpText").textContent = `${t.xp} XP` + (next ? ` · ${next[0] - t.xp} XP lagi menuju ${next[1]}` : " · pangkat tertinggi");
+  ["map", "badges", "me"].forEach(k => $("#tab-" + k).setAttribute("aria-selected", String(state.tab === k && !state.level)));
+}
+function padHTML(l, i) {
+  const r = P.levels[l.id], open = unlocked(i), ok = passed(l.id);
+  const chip = !open ? `<span class="chip lock">${ICON.lock} Terkunci</span>` : ok ? `<span class="chip pass">Lulus</span>` : `<span class="chip open">Terbuka</span>`;
+  const code = l.id === "BOSS" ? "CHIP-FINAL" : "MISI " + l.id.slice(1).padStart(2, "0");
+  return `<button class="pad${l.id === "BOSS" ? " boss" : ""}" data-lv="${l.id}" ${open ? "" : "disabled aria-disabled=\"true\""}>
+    <span class="pin"></span>
+    <span class="code"><span>${code}</span>${r ? `<span class="mono">${Math.round(r.best)}%</span>` : ""}</span>
+    <h3>${sx(l.title)}</h3><p>${sx(l.desc)}</p>
+    <span class="foot">${stars(r?.stars || 0)}${chip}</span></button>`;
+}
+function viewMap() {
+  const w = wk => LEVELS.map((l, i) => [l, i]).filter(([l]) => l.week === wk);
+  const t6 = ["L1", "L2", "L3", "L4", "L5"].filter(passed).length, t7 = ["L6", "L7", "L8", "L9", "L10"].filter(passed).length;
+  return `
+  <section class="board"><div class="board-head"><h2>Papan Minggu 6 · Transistor BJT</h2><span class="meta">${t6}/5 misi lulus</span></div>
+    <div class="pads">${w(6).map(([l, i]) => padHTML(l, i)).join("")}</div></section>
+  <section class="board"><div class="board-head"><h2>Papan Minggu 7 · Bias &amp; Penguat</h2><span class="meta">${t7}/5 misi lulus</span></div>
+    <div class="pads">${w(7).map(([l, i]) => padHTML(l, i)).join("")}</div></section>
+  <section class="board"><div class="board-head"><h2>Chip Final</h2><span class="meta">Terbuka setelah 10 misi lulus</span></div>
+    <div class="pads">${padHTML(LEVELS[10], 10)}</div></section>
+  <p style="color:var(--muted);font-size:14px">Lulus misi = skor minimal ${PASS}%. Bintang: ≥60% ★, ≥75% ★★, ≥90% ★★★. Soal hitungan memakai angka acak, jadi setiap percobaan berbeda.</p>`;
+}
+function viewLesson(l) {
+  const r = P.levels[l.id];
+  return `<button class="back" data-act="home">← Kembali ke peta</button>
+  <div class="panel"><div class="row" style="justify-content:space-between">
+    <div><div class="mono" style="color:var(--muted);font-size:13px">${l.id === "BOSS" ? "CHIP-FINAL" : "MISI " + l.id.slice(1).padStart(2, "0")}</div><h2 style="font-size:26px">${sx(l.title)}</h2></div>
+    ${r ? `<div style="text-align:right">${stars(r.stars)}<div class="mono" style="font-size:13px;color:var(--muted)">Terbaik ${Math.round(r.best)}% · ${r.attempts}× mencoba</div></div>` : ""}</div>
+    <div class="lesson-grid">${l.lesson.map(c => `<div class="lcard"><h4>${sx(c[0])}</h4>${c[1] ? `<p>${sx(c[1])}</p>` : ""}${c[2] ? `<div class="formula">${sx(c[2])}</div>` : ""}</div>`).join("")}</div>
+    ${l.id === "BOSS" && r ? `<div class="notice" style="margin:0">Ujian Akhir sudah kamu kerjakan (skor ${Math.round(r.best)}%). Ujian hanya bisa dikerjakan sekali.</div>`
+      : `<div class="row"><button class="btn" data-act="start">${l.id === "BOSS" ? "Mulai Ujian (sekali saja)" : "Mulai Tantangan"}</button><span style="color:var(--muted);font-size:14px">${l.id === "BOSS" ? `8 soal · ${UJIAN.menit} menit` : "5 soal"} · satu kali jawab per soal</span></div>`}</div>`;
+}
+function viewQuiz() {
+  const Q = state.quiz, q = Q.qs[Q.i], ans = Q.answers[Q.i];
+  const dots = Q.qs.map((_, k) => `<i class="${k === Q.i && !ans ? "now" : Q.answers[k] ? (Q.answers[k].ok ? "ok" : "no") : ""}"></i>`).join("");
+  let body = "";
+  if (q.kind === "mcq") body = `<div class="opts">${q.opts.map((o, k) => { let cls = ""; if (ans) { if (k === q.ans) cls = "sel-ok"; else if (k === ans.pick) cls = "sel-no"; } return `<button class="opt ${cls}" data-opt="${k}" ${ans ? "disabled" : ""}>${String.fromCharCode(65 + k)}. ${sx(o)}</button>`; }).join("")}</div>`;
+  else body = `<form class="numin" id="numform"><label for="numans" class="sr" style="position:absolute;left:-9999px">Jawaban</label><input id="numans" inputmode="decimal" autocomplete="off" placeholder="contoh: 3,55" ${ans ? `disabled value="${esc(ans.raw)}"` : ""}><span class="unit">${esc(q.unit)}</span>${ans ? "" : `<button class="btn" type="submit">Periksa</button>`}</form>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px">Gunakan koma atau titik untuk desimal. Toleransi ±3%.</div>`;
+  let fb = "";
+  if (ans) {
+    const steps = q.kind === "num" ? q.steps : [q.why];
+    fb = `<div class="fb ${ans.ok ? "ok" : "no"}"><h4>${ans.ok ? "Benar! +10" : "Belum tepat"}</h4>
+      ${q.kind === "num" ? `<div>Jawaban: <b class="mono">${f(q.ans, q.dec + 1)} ${esc(q.unit)}</b></div>` : ""}
+      <ol class="steps">${steps.map(s => `<li><span class="${q.kind === "num" ? "mono" : ""}">${sx(s)}</span></li>`).join("")}</ol></div>
+      <div class="row" style="margin-top:14px"><button class="btn" data-act="next" id="nextbtn">${Q.i + 1 < Q.qs.length ? "Soal berikutnya →" : "Lihat hasil →"}</button></div>`;
+  }
+  const X = state.exam;
+  if (X && UJIAN.wajibLayarPenuh && X.fsSupported && !document.fullscreenElement) {
+    return `<div class="panel" style="text-align:center"><h2 style="font-size:22px">Ujian dijeda</h2><p>Kamu keluar dari layar penuh. Ini tercatat sebagai pelanggaran (${X.viol} dari ${UJIAN.maksPelanggaran}). Waktu tetap berjalan.</p><button class="btn" data-act="fs">Kembali ke layar penuh dan lanjutkan</button></div>`;
+  }
+  const hud = X ? `<div class="examhud"><span class="t" id="examTimer">${fmtLeft()}</span><span>Ujian Akhir · ${esc(P.nama)} (${esc(P.nim)})</span>${X.viol ? `<span class="v">Pelanggaran ${X.viol}/${UJIAN.maksPelanggaran}</span>` : ""}</div>` : "";
+  return `<button class="back" data-act="quit">${X ? "■ Akhiri ujian sekarang" : "← Keluar misi"}</button>${hud}
+  <div class="panel"><div class="qtop"><h2 style="font-size:20px">${sx(state.level.title)}</h2><div class="row"><div class="dots">${dots}</div><span class="mono" style="font-size:13px">${Q.i + 1}/${Q.qs.length}</span></div></div>
+  ${q.ctx ? `<div class="ctx"><b style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Diketahui</b>${q.ctx}</div>` : ""}
+  <div class="qtext">${sx(q.q)}</div>${body}${fb}</div>`;
+}
+function viewResult() {
+  const R = state.result;
+  return `<div class="panel result"><div class="mono" style="color:var(--muted)">${sx(state.level.title)}</div>
+    <div class="big">${R.pct}%</div><div>${R.correct} dari ${R.total} benar</div>
+    <div style="margin:10px 0">${stars(R.stars)}</div>
+    ${state.level.id === "BOSS" ? `<h3 style="font-size:20px">${R.pct >= PASS ? "Selamat, kamu lulus Ujian Akhir!" : "Ujian Akhir selesai."}</h3>`
+      : `<h3 style="font-size:20px">${R.pct >= PASS ? (R.next ? "Misi lulus! Misi berikutnya terbuka." : "Misi lulus!") : "Belum lulus. Coba lagi, soal dan angkanya diacak ulang."}</h3>
+    ${R.best ? `<p style="color:var(--muted)">Skor terbaik baru tersimpan.</p>` : `<p style="color:var(--muted)">Skor terbaikmu tetap ${R.prev}%.</p>`}`}
+    ${R.newBadges.length ? `<div class="newbadges">${R.newBadges.map(b => `<span class="chip pass" style="font-size:13px">Lencana baru: ${esc(b)}</span>`).join("")}</div>` : ""}
+    ${R.reason ? `<p style="color:var(--bad);font-weight:700">${esc(R.reason)}</p>` : ""}
+    <p style="font-size:14px;color:var(--muted)">${sheetReady() ? (OUTBOX.length ? (navigator.onLine ? "Nilai sedang dikirim ke dosen…" : "Nilai akan terkirim ke dosen begitu ada koneksi internet.") : "Nilai sudah dikirim ke dosen.") : "Mode latihan: nilai tidak dikirim ke dosen."}</p>
+    <div class="row" style="justify-content:center;margin-top:16px">${state.level.id === "BOSS" ? "" : `<button class="btn ghost" data-act="retry">Ulangi misi</button>`}<button class="btn" data-act="home">Kembali ke peta</button></div></div>`;
+}
+function viewBadges() {
+  const got = earned();
+  return `<div class="badges">${BADGES.map(b => `<div class="badge ${got.includes(b[0]) ? "" : "off"}"><div class="ico">${ICON.chip}</div><div><h4>${esc(b[1])}</h4><p>${esc(b[2])}</p></div></div>`).join("")}</div>
+    <p style="color:var(--muted);font-size:14px;margin-top:14px">${got.length} dari ${BADGES.length} lencana terkumpul.</p>`;
+}
+function viewMe() {
+  return `<div class="panel"><h2 style="font-size:20px">Identitas Mahasiswa</h2>
+    <p style="color:var(--muted);font-size:14px;margin:6px 0 0">Nama, NIM, dan kelas dikirim bersama setiap nilai ke dosen. Isi dengan benar sebelum mulai bermain.</p>
+    <form id="identform" class="ident"><label for="nama">Nama lengkap<input id="nama" maxlength="60" required value="${esc(P.nama || "")}"></label>
+    <label for="nim">NIM<input id="nim" maxlength="20" required value="${esc(P.nim || "")}"></label>
+    <label for="kelas">Kelas<input id="kelas" maxlength="20" required value="${esc(P.kelas || "")}"></label>
+    <button class="btn" type="submit">Simpan identitas</button></form><div id="identmsg" style="font-size:14px;margin-top:8px;color:var(--good)"></div></div>`;
+}
+
+/* ---------------- exam (Ujian Akhir) ---------------- */
+function fmtLeft() { const X = state.exam; if (!X) return ""; const ms = Math.max(0, X.deadline - Date.now()); const m = Math.floor(ms / 60000), sec = Math.floor(ms / 1000) % 60; return `Sisa ${m}:${String(sec).padStart(2, "0")}`; }
+function violation(kind) {
+  const X = state.exam; if (!X || X.ending) return;
+  const now = Date.now(); if (now - X.lastViol < 1500) return; X.lastViol = now;
+  X.viol++; X.log.push(kind); saveExam();
+  if (X.viol >= UJIAN.maksPelanggaran) { finishQuiz(`Ujian dihentikan otomatis: ${X.viol} kali keluar dari halaman ujian.`); return; }
+  render();
+}
+function saveExam() { const X = state.exam, Q = state.quiz; if (!X) return; P.exam = { start: X.start, deadline: X.deadline, viol: X.viol, correct: Q.answers.filter(a => a && a.ok).length, total: Q.qs.length }; saveLocal(); }
+async function enterFS() { try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) { } }
+function exitFS() { try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) { } }
+document.addEventListener("visibilitychange", () => { if (document.hidden) violation("pindah tab/aplikasi"); });
+document.addEventListener("fullscreenchange", () => { if (!state.exam) return; if (!document.fullscreenElement && UJIAN.wajibLayarPenuh && state.exam.fsSupported) violation("keluar layar penuh"); else render(); });
+["copy", "cut", "paste", "contextmenu"].forEach(ev => document.addEventListener(ev, e => { if (state.exam) e.preventDefault(); }));
+// Ujian yang terputus (halaman ditutup/dimuat ulang) dinilai dari jawaban yang sudah masuk.
+function recoverExam() {
+  if (!P.exam || P.levels.BOSS) { P.exam = null; return; }
+  const E = P.exam, pct = Math.round((E.correct || 0) / (E.total || 8) * 100);
+  P.levels.BOSS = { best: pct, stars: starsFor(pct), attempts: 1, last: Date.now() };
+  submit(record(LV.BOSS, pct, E.correct || 0, E.total || 8, pct, 1, E.viol || 0, "Halaman ditutup/dimuat ulang saat ujian", Math.round((Date.now() - E.start) / 1000)));
+  P.exam = null; persist();
+  notice(`Ujian Akhir sebelumnya terputus dan sudah dinilai dari jawaban yang masuk (${pct}%).`);
+}
+function record(l, pct, correct, total, best, attempts, viol, note, dur) {
+  return { nama: P.nama, nim: P.nim, kelas: P.kelas, misi: l.id, judul: l.title, skor: pct, benar: correct, jumlah: total, bintang: starsFor(pct), terbaik: best, percobaan: attempts, pelanggaran: viol, catatan: note || "", durasi_detik: dur, waktu_klien: new Date().toISOString() };
+}
+
+/* ---------------- render & events ---------------- */
+function render() {
+  header();
+  document.body.classList.toggle("exam-on", !!state.exam);
+  const v = $("#view");
+  if (state.inQuiz) v.innerHTML = viewQuiz();
+  else if (state.result) v.innerHTML = viewResult();
+  else if (state.level) v.innerHTML = viewLesson(state.level);
+  else v.innerHTML = state.tab === "badges" ? viewBadges() : state.tab === "me" ? viewMe() : viewMap();
+  if (state.inQuiz) { const inp = $("#numans"); if (inp && !inp.disabled) inp.focus({ preventScroll: true }); const nb = $("#nextbtn"); if (nb) nb.focus({ preventScroll: true }); }
+}
+async function startQuiz() {
+  const l = state.level;
+  if (!identOK()) { state.level = null; state.tab = "me"; notice("Isi nama, NIM, dan kelas dulu sebelum mengerjakan misi."); render(); return; }
+  if (l.id === "BOSS") {
+    if (P.levels.BOSS) { render(); return; }
+    if (UJIAN.wajibSEB && !/SEB/i.test(navigator.userAgent)) { notice("Ujian Akhir hanya bisa dimulai dari aplikasi Safe Exam Browser. Hubungi dosen untuk file konfigurasinya."); return; }
+    const fsSupported = !!(document.documentElement.requestFullscreen && document.fullscreenEnabled);
+    if (UJIAN.wajibLayarPenuh && fsSupported) await enterFS();
+    const start = Date.now();
+    state.exam = { start, deadline: start + UJIAN.menit * 60000, viol: 0, log: [], lastViol: 0, fsSupported };
+    state.exam.timer = setInterval(() => { const t = $("#examTimer"); if (t) t.textContent = fmtLeft(); if (Date.now() >= state.exam.deadline) finishQuiz("Waktu ujian habis."); }, 1000);
+  }
+  notice(null);
+  state.quiz = { qs: l.gen(), i: 0, answers: [], start: Date.now() }; state.inQuiz = true; state.result = null;
+  if (state.exam) saveExam();
+  render(); window.scrollTo({ top: 0 });
+}
+function answer(a) {
+  const Q = state.quiz; Q.answers[Q.i] = a;
+  if (state.exam) { saveExam(); if (Q.i + 1 < Q.qs.length) { Q.i++; render(); } else finishQuiz(); return; }
+  render();
+}
+function finishQuiz(reason) {
+  const Q = state.quiz, l = state.level, X = state.exam;
+  if (X) { if (X.ending) return; X.ending = true; clearInterval(X.timer); }
+  const correct = Q.answers.filter(a => a && a.ok).length, total = Q.qs.length, pct = Math.round(correct / total * 100);
+  const before = earned(); const prev = P.levels[l.id];
+  const best = Math.max(prev?.best ?? 0, pct);
+  P.levels[l.id] = { best, stars: starsFor(best), attempts: (prev?.attempts || 0) + 1, last: Date.now() };
+  const after = earned(); const newB = after.filter(x => !before.includes(x)).map(x => BADGES.find(b => b[0] === x)[1]);
+  const i = LEVELS.indexOf(l);
+  state.result = { pct, correct, total, stars: starsFor(pct), best: pct > (prev?.best ?? -1), prev: Math.round(prev?.best ?? 0), newBadges: newB, next: pct >= PASS && LEVELS[i + 1] && !(prev?.best >= PASS), reason: X ? reason : "" };
+  submit(record(l, pct, correct, total, best, P.levels[l.id].attempts, X ? X.viol : "", X ? [reason, X.log.length ? "pelanggaran: " + X.log.join(", ") : ""].filter(Boolean).join(" · ") : "", Math.round((Date.now() - Q.start) / 1000)));
+  if (X) { state.exam = null; P.exam = null; exitFS(); }
+  state.inQuiz = false; persist(); render(); window.scrollTo({ top: 0 });
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (state.exam && !t.dataset.opt && !["next", "quit", "fs"].includes(t.dataset.act) && t.id !== "numsubmit") { if (t.type !== "submit") return; }
+  if (t.classList.contains("tab")) { state.tab = t.id.replace("tab-", ""); state.level = null; state.result = null; state.inQuiz = false; render(); return; }
+  if (t.dataset.lv) { if (!identOK()) { state.tab = "me"; notice("Isi nama, NIM, dan kelas dulu sebelum mengerjakan misi."); render(); return; } state.level = LV[t.dataset.lv]; state.result = null; render(); window.scrollTo({ top: 0 }); return; }
+  if (t.dataset.opt != null) { const q = state.quiz.qs[state.quiz.i]; if (state.quiz.answers[state.quiz.i]) return; const k = +t.dataset.opt; answer({ pick: k, ok: k === q.ans }); return; }
+  const act = t.dataset.act;
+  if (act === "home") { state.level = null; state.result = null; state.inQuiz = false; state.tab = "map"; render(); }
+  else if (act === "start" || act === "retry") startQuiz();
+  else if (act === "quit") { if (state.exam) finishQuiz("Ujian diakhiri oleh mahasiswa."); else { state.inQuiz = false; render(); } }
+  else if (act === "fs") { enterFS(); }
+  else if (act === "next") { const Q = state.quiz; if (Q.i + 1 < Q.qs.length) { Q.i++; render(); } else finishQuiz(); }
+});
+document.addEventListener("submit", e => {
+  e.preventDefault();
+  if (e.target.id === "numform") {
+    const raw = $("#numans").value, v = parseNum(raw); if (isNaN(v)) { $("#numans").setCustomValidity("Masukkan angka"); $("#numans").reportValidity(); $("#numans").setCustomValidity(""); return; }
+    const q = state.quiz.qs[state.quiz.i]; const ok = Math.abs(v - q.ans) <= Math.abs(q.ans) * q.tol + 1e-9;
+    answer({ raw, ok });
+  } else if (e.target.id === "identform") {
+    P.nama = $("#nama").value.trim(); P.nim = $("#nim").value.trim(); P.kelas = $("#kelas").value.trim(); persist(); setSync();
+    if (identOK()) { notice(null); $("#identmsg").textContent = "Identitas tersimpan. Silakan mulai dari Peta Misi."; }
+  }
+});
+window.addEventListener("beforeunload", e => { if (state.exam) { saveExam(); e.preventDefault(); e.returnValue = ""; } });
+
+loadLocal(); recoverExam();
+if (!identOK()) { state.tab = "me"; notice("Selamat datang! Isi nama, NIM, dan kelas dulu, lalu mulai dari Misi 01."); }
+else if (!sheetReady()) notice("Mode latihan: alamat Google Sheet belum diisi dosen, jadi nilai belum dikirim.");
+render(); setSync(); flush();
+})();
+</script>
+
+</body>
+</html>
